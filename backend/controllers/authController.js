@@ -1,42 +1,70 @@
-const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const AppError = require("../utils/appError");
+const asyncHandler = require("../utils/asyncHandler");
+const generateToken = require("../utils/generateToken");
 
-// Protect routes with JWT
-exports.protect = async (req, res, next) => {
-  let token;
+exports.register = asyncHandler(async (req, res, next) => {
+  const { username, email, password, phone } = req.body;
 
-  if (req.cookies.token) {
-    token = req.cookies.token;
-  } else if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    token = req.headers.authorization.split(" ")[1];
+  // Check if user exists
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return next(new AppError("User already exists with this email", 400));
   }
 
-  if (!token) {
-    return next(new AppError("Not authorized to access this route", 401));
+  // Create user
+  const user = await User.create({
+    username,
+    email,
+    phone,
+    password,
+  });
+
+  // Generate token
+  const token = generateToken(user._id);
+
+  res.status(201).json({
+    status: "success",
+    token,
+    data: {
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+    },
+  });
+});
+
+exports.login = asyncHandler(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  // Check if user exists
+  const user = await User.findOne({ email }).select("+password");
+  if (!user || !(await user.comparePassword(password))) {
+    return next(new AppError("Invalid email or password", 401));
   }
 
-  try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id);
-    next();
-  } catch (err) {
-    return next(new AppError("Not authorized to access this route", 401));
-  }
-};
+  // Generate token
+  const token = generateToken(user._id);
 
-// Role-based authorization
-exports.authorize = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return next(
-        new AppError(`User role ${req.user.role} is not authorized`, 403)
-      );
-    }
-    next();
-  };
+  res.status(200).json({
+    status: "success",
+    token,
+    data: {
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    },
+  });
+});
+
+// Add to User model
+User.methods.comparePassword = async function (candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
 };
