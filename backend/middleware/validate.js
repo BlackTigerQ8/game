@@ -1,6 +1,6 @@
 const { validationResult } = require("express-validator");
 
-module.exports = (req, res, next) => {
+const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const errorMessages = errors.array().map((err) => err.msg);
@@ -11,3 +11,5 @@ module.exports = (req, res, next) => {
   }
   next();
 };
+
+module.exports = validate;

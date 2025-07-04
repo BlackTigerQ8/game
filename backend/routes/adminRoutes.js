@@ -1,38 +1,18 @@
 const express = require("express");
-const adminController = require("../controllers/adminController");
-const validate = require("../middleware/validate");
-const { body } = require("express-validator");
-const authorize = require("../middleware/authorize");
+const { authorize, protect } = require("../middleware/authorize");
+const {
+  createCategory,
+  createQuestion,
+  getStats,
+  getUsers,
+} = require("../controllers/adminController");
 
 const router = express.Router();
+router.use(protect, authorize("admin"));
 
-// Apply auth and admin authorization to all admin routes
-router.use(require("../middleware/authorize"), authorize("admin"));
-
-router.post(
-  "/categories",
-  [body("name").trim().notEmpty().withMessage("Category name is required")],
-  validate,
-  adminController.createCategory
-);
-
-router.post(
-  "/questions",
-  [
-    body("category").isMongoId().withMessage("Invalid category ID"),
-    body("title").trim().notEmpty().withMessage("Question title is required"),
-    body("description")
-      .trim()
-      .notEmpty()
-      .withMessage("Description is required"),
-    body("level")
-      .isIn(["easy", "medium", "hard"])
-      .withMessage("Invalid difficulty level"),
-  ],
-  validate,
-  adminController.createQuestion
-);
-
-router.get("/stats", adminController.getStats);
+router.route("/categories").post(createCategory);
+router.route("/questions").post(createQuestion);
+router.route("/stats").get(getStats);
+router.route("/users").get(getUsers);
 
 module.exports = router;
